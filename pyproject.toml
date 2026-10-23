@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "easyproto-actions"
+version = "0.1.0"
+description = "Small async Telegram user-action wrappers powered by Telethon"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["Telethon==1.45.0"]
+
+[project.optional-dependencies]
+fast = ["cryptg>=0.4,<1"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "build>=1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+easyproto = ["py.typed"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
