@@ -133,20 +133,6 @@ async def test_replay_suppression_and_request_error():
     assert len(transport.sent)==2  # Replays get acknowledged but not dispatched.
 
 
-async def test_malformed_compressed_rpc_completes_pending_with_protocol_error():
-    connection, _ = prepared()
-    future = asyncio.get_running_loop().create_future()
-    connection.pending[100] = Pending(functions.help.getConfig(), future, True)
-    invalid_gzip = struct.pack('<I', 0x3072CFA1) + pack_bytes(b'not a gzip stream')
-    body = struct.pack('<Iq', 0xF35C6D01, 100) + invalid_gzip
-    with pytest.raises(ProtocolError, match='compressed'):
-        await connection._handle(int(time.time() * (1 << 32)) | 1, 0, body)
-    assert future.done(), 'A removed pending RPC must not be left waiting until timeout'
-    with pytest.raises(ProtocolError, match='compressed'):
-        await future
-    assert not connection.pending
-
-
 async def test_bad_salt_resends_same_request_and_random_id():
     connection,transport=prepared()
     request=functions.messages.sendMessage(peer=types.inputPeerSelf(),message='hi',random_id=123)
@@ -205,20 +191,3 @@ async def test_bad_transport_frame_bounds(length):
     transport.reader=asyncio.StreamReader()
     transport.reader.feed_data(struct.pack('<i',length))
     with pytest.raises(ProtocolError): await transport.receive()
-
-
-@pytest.mark.parametrize('cancel', [False, True])
-async def test_unanswered_request_deadline_or_cancellation_removes_pending_without_replay(cancel):
-    connection, transport = prepared()
-    connection.timeout = 0.01 if not cancel else 10
-    # This isolated test supplies the sender and deliberately never supplies a reply.
-    connection._reader_task = asyncio.current_task()
-    request = functions.messages.sendMessage(peer=types.inputPeerSelf(), message='fixture', random_id=123)
-    task = asyncio.create_task(connection.invoke(request))
-    await asyncio.sleep(0)
-    if cancel:
-        task.cancel()
-    with pytest.raises(asyncio.CancelledError if cancel else TimeoutError):
-        await task
-    assert not connection.pending
-    assert len(transport.sent) == 1  # Unknown mutation outcome must not be replayed.

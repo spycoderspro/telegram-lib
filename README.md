@@ -261,27 +261,3 @@ RPC responses. They do not contact Telegram or send account messages. The codec
 suite also exercises all 2,628 registered declarations from the pinned schemas
 using synthetic minimal values; that is not a live compatibility guarantee.
 See [VALIDATION.md](VALIDATION.md) before considering production use.
-
-## Save Restricted Content Bot client-layer validation (2026-10-24)
-
-The baseline passed **105 offline tests**. On the local feature branch
-`validation/save-restricted-workflow`, focused RPC/session fixes and regression
-coverage plus the separate harness pass **127 offline tests**, with **2 live
-integration tests skipped**. Run both suites explicitly:
-
-```sh
-uv sync --frozen --extra dev --extra fast
-.venv/bin/python -m pytest -q tests integration -rs
-```
-
-See [integration/README.md](integration/README.md) for staged account checks and
-an authorized, one-message download/hash/upload/hash relay using `easyproto.Client`
-directly. It refuses protected/expiring content and requires a known source hash.
-It is a client-layer harness, not a validated deployed bot. Runtime dependencies,
-public method signatures and bundled protocol schemas are unchanged.
-
-The production and test DC 2 TCP connections were both refused in this cloud.
-**No real Telegram login, account RPC, transfer, or bot workflow has passed here;
-real upload/download speeds remain unmeasured.** Offline readiness is sufficient
-to develop and test the library, but production readiness is not established.
-Read [VALIDATION.md](VALIDATION.md) for exact scope, fixes and remaining risks.
