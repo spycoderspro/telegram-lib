@@ -1,0 +1,24 @@
+{
+  "repository": "telegramdesktop/tdesktop",
+  "commit": "a7f453612f4896ac04d0007a36ab0d377e5bcbcf",
+  "layer": 232,
+  "files": {
+    "api.tl": {
+      "url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a7f453612f4896ac04d0007a36ab0d377e5bcbcf/Telegram/SourceFiles/mtproto/scheme/api.tl",
+      "sha256": "76922ce265441d3f2f5188f56b69b41e1cb11354657ea547707507f8c3b93826"
+    },
+    "mtproto.tl": {
+      "url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a7f453612f4896ac04d0007a36ab0d377e5bcbcf/Telegram/SourceFiles/mtproto/scheme/mtproto.tl",
+      "sha256": "40c10255afb6cfcbcfc190a457a53b66ec9e410f6418cd97cc4c276709a739a9"
+    },
+    "UPSTREAM_LICENSE": {
+      "url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a7f453612f4896ac04d0007a36ab0d377e5bcbcf/LICENSE",
+      "sha256": "a728b65d02eeaf6b50c075a33b76107c652c3e5a12ff67f53682c83d47a23e1e"
+    },
+    "UPSTREAM_LEGAL": {
+      "url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a7f453612f4896ac04d0007a36ab0d377e5bcbcf/LEGAL",
+      "sha256": "0d37f2717dc27ae914194c404eff323fb7bee92d77d5d50a593be12bef596638"
+    }
+  },
+  "keys_source": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a7f453612f4896ac04d0007a36ab0d377e5bcbcf/Telegram/SourceFiles/mtproto/mtproto_dc_options.cpp"
+}

@@ -4,21 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "easyproto-actions"
-version = "0.1.0"
-description = "Small async Telegram user-action wrappers powered by Telethon"
+version = "0.2.0a2"
+description = "Experimental independent async MTProto 2.0 client with simple Telegram user actions"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["Telethon==1.45.0"]
+dependencies = ["pycryptodome==4.1.0"]
 
 [project.optional-dependencies]
-fast = ["cryptg>=0.4,<1"]
+fast = ["cryptg==0.6.0; python_version >= '3.11'"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23", "build>=1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-easyproto = ["py.typed"]
+easyproto = ["py.typed", "schemas/*.tl", "schemas/*.json", "schemas/UPSTREAM_*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
