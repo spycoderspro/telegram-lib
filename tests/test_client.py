@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from easyproto import Client, TLObject, functions, types
-from easyproto.errors import AuthorizationRequired, FloodWaitError, RPCError, UnsupportedFeature
+from easyproto.errors import AuthorizationRequired, FloodWaitError, MigrationRequired, RPCError, UnsupportedFeature
 
 
 @pytest.fixture
@@ -234,3 +234,114 @@ async def test_chats_includes_self_without_access_hash(pair):
     chats=[chat async for chat in client.chats(limit=1)]
     assert [chat.id for chat in chats]==[42]
     assert (await client.resolve(42)).name=='inputPeerSelf'
+
+
+async def test_bounded_flood_retry_keeps_random_id(pair, monkeypatch):
+    client, connection = pair
+    client.flood_sleep_threshold = 2
+    sleep = AsyncMock()
+    monkeypatch.setattr('easyproto.client.asyncio.sleep', sleep)
+    connection.invoke.side_effect = [FloodWaitError(420, 'FLOOD_WAIT_2', 2),
+        TLObject('updateShortSentMessage', id=7, date=1)]
+    assert (await client.send('me', 'fixture')).id == 7
+    sleep.assert_awaited_once_with(2)
+    requests = [call.args[0] for call in connection.invoke.call_args_list]
+    assert len(requests) == 2 and requests[0] is requests[1]
+    connection.invoke.reset_mock()
+    connection.invoke.side_effect = FloodWaitError(420, 'FLOOD_WAIT_2', 2)
+    with pytest.raises(FloodWaitError): await client.send('me', 'fixture')
+    assert connection.invoke.await_count == 2  # No third retry.
+
+
+async def test_user_migration_exports_imports_and_preserves_lock(pair, tmp_path, monkeypatch):
+    from easyproto.session import Session
+    client, old = pair
+    client.session = Session.load(tmp_path / 'account')
+    client.session.user_id = 42
+    client.session.acquire()
+    lock = client.session._lock_file
+    exported = TLObject('auth.exportedAuthorization', id=9, bytes=b'offline-only')
+    old.invoke.side_effect = [MigrationRequired(303, 'USER_MIGRATE_4', 4), exported]
+    replacement = MagicMock()
+    replacement.invoke = AsyncMock(side_effect=[TLObject('auth.authorization'),
+        TLObject('updateShortSentMessage', id=7, date=1)])
+    replacement.close = AsyncMock()
+    monkeypatch.setattr('easyproto.client.Connection', lambda *args, **kwargs: replacement)
+    monkeypatch.setattr(client, '_initialize', AsyncMock())
+    try:
+        assert (await client.send('me', 'fixture')).id == 7
+        assert old.invoke.call_args.args[0].name == 'auth.exportAuthorization'
+        assert replacement.invoke.call_args_list[0].args[0].name == 'auth.importAuthorization'
+        assert client.session.dc_id == 4 and client.session.user_id == 42
+        assert client.session._lock_file is lock
+        assert Session.load(tmp_path / 'account').dc_id == 4
+        old.close.assert_awaited_once()
+    finally:
+        await client.close()
+    assert lock.closed
+
+
+async def test_cross_dc_download_authorization_failure_closes_temporary_connection(pair, monkeypatch):
+    client, old = pair
+    old.invoke.return_value = TLObject('auth.exportedAuthorization', id=9, bytes=b'offline-only')
+    temporary = MagicMock()
+    temporary.invoke = AsyncMock(side_effect=RPCError(400, 'AUTH_BYTES_INVALID'))
+    temporary.close = AsyncMock()
+    monkeypatch.setattr('easyproto.client.Connection', lambda *args, **kwargs: temporary)
+    monkeypatch.setattr(client, '_initialize', AsyncMock())
+    with pytest.raises(RPCError):
+        async with client._at_dc(4):
+            pytest.fail('Failed authorization must not yield a usable connection')
+    temporary.close.assert_awaited_once()
+    old.close.assert_not_awaited()
+
+
+async def test_file_migration_is_not_replayed_as_account_migration(pair):
+    client, connection = pair
+    connection.invoke.side_effect = MigrationRequired(303, 'FILE_MIGRATE_4', 4)
+    with pytest.raises(MigrationRequired): await client.raw.help.getConfig()
+    connection.invoke.assert_awaited_once()
+
+
+async def test_open_reloads_session_after_acquiring_lock(tmp_path, monkeypatch):
+    from easyproto.session import Session
+    path = tmp_path / 'account'
+    client = Client(12345, 'offline-placeholder', session=path)
+    # A different owner finishes login after this Client was constructed.
+    writer = Session.load(path)
+    writer.acquire()
+    try:
+        writer.auth_key = bytes(range(256))
+        writer.user_id = 42
+        writer.save()
+    finally:
+        writer.release()
+    opened = []
+    connection = MagicMock()
+    connection.close = AsyncMock()
+    def factory(session, **kwargs):
+        opened.append(session)
+        return connection
+    monkeypatch.setattr('easyproto.client.Connection', factory)
+    monkeypatch.setattr(client, '_initialize', AsyncMock())
+    try:
+        await client._open()
+        assert opened[0].user_id == 42
+        assert opened[0].auth_key == bytes(range(256))
+    finally:
+        await client.close()
+    assert client.session._lock_file is None
+
+
+async def test_failed_session_refresh_releases_lock(tmp_path):
+    from easyproto.errors import ProtocolError
+    from easyproto.session import Session
+    client = Client(12345, 'offline-placeholder', session=tmp_path / 'account')
+    client.session.path.write_text('{}')
+    client.session.path.chmod(0o600)
+    with pytest.raises(ProtocolError): await client._open()
+    assert client.session._lock_file is None
+    # The failed opener must not leave another owner blocked.
+    other = Session(client.session.path)
+    other.acquire()
+    other.release()

@@ -179,9 +179,9 @@ class Connection:
             pending = self.pending.pop(request_id, None)
             if not pending or pending.future.done():
                 return
-            data = self._unzip(reader.read(reader.remaining()))
-            kind = "Object" if data[:4] == struct.pack("<I", 0x2144CA19) else self.schema.result_type(pending.request)
             try:
+                data = self._unzip(reader.read(reader.remaining()))
+                kind = "Object" if data[:4] == struct.pack("<I", 0x2144CA19) else self.schema.result_type(pending.request)
                 result = self.schema.decode(data, kind)
                 if isinstance(result, TLObject) and result.name == "rpc_error":
                     pending.future.set_exception(rpc_error(result.error_code, result.error_message))

@@ -136,8 +136,15 @@ class Client:
         if self._connection and not self._connection.closed.is_set():
             return
         self.session.acquire()
-        self._connection = Connection(self.session, timeout=self.timeout)
         try:
+            # Construction may precede another owner's login or DC migration.
+            # Re-read persisted state only after owning the session lock.
+            if self.session.path is not None and self.session.path.exists():
+                refreshed = Session.load(self.session.path, dc_id=self.session.dc_id,
+                                         test_mode=self.session.test_mode)
+                refreshed._lock_file, self.session._lock_file = self.session._lock_file, None
+                self.session = refreshed
+            self._connection = Connection(self.session, timeout=self.timeout)
             await self._initialize(self._connection)
         except BaseException:
             await self.close()

@@ -49,3 +49,29 @@ Real Telegram upload/download throughput, actual account limits and comparative
 Telethon/Kurigram speeds. The cloud previously refused the Telegram test DC TCP
 connection, and no live account credentials were used. Benchmark actual files on
 a reachable machine before choosing a worker count above the default four.
+
+## Validation rerun, 2026-10-24
+
+Same existing latency simulation, Python 3.12.14, cryptg 0.6.0, Linux cloud machine:
+
+```sh
+.venv/bin/python examples/benchmark_transfers.py --size-mib 8 --latency-ms 40 --workers 1 2 4
+```
+
+| Chunk workers | Peak simulated in-flight RPCs | Upload seconds | Download seconds |
+|---|---|---|---|
+| 1 | 1 | 0.6721 | 0.6580 |
+| 2 | 2 | 0.3317 | 0.3360 |
+| 4 | 4 | 0.1687 | 0.1713 |
+
+All simulated transfers matched SHA-256. The separate 512 KiB encryption run took
+0.149220 seconds in the Python implementation and 0.001162 seconds with cryptg,
+with identical ciphertext. These are one-run local timings, excluding Telegram
+networking, transport encryption in the transfer simulation, and account limits.
+They must not be described as Telegram throughput or a client comparison.
+
+No live transfer duration, speed, error rate, FloodWait frequency, CPU or memory
+measurements are available. The opt-in [harness](integration/README.md) can record
+those on a machine with credentials and reachable MTProto TCP; its documented
+metrics include process CPU/RSS and observed transfer errors, with uninstrumented
+internal library retry counts explicitly null.
